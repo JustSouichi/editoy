@@ -1,7 +1,7 @@
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
-import os, random
+import os, random, datetime
 
 def find_video_with_minimum_length(min_length_sec, search_dir, used_videos):
     suitable_videos = []
@@ -64,8 +64,13 @@ def process_audio_and_video(audio_path, audio_output_dir="videos/out", initial_v
 
     # Concatenate all video clips into a final video
     final_clips = [VideoFileClip(path) for path in video_clip_paths]
-    final_video = concatenate_videoclips(final_clips)
-    final_video_path = os.path.join(audio_output_dir, f"{base_filename}_final_video.mp4")
+    final_video = concatenate_videoclips(final_clips, method="compose")
+    
+    # Format the final video name with the current day and hour
+    current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    final_video_name = f"final_video_{base_filename}_{current_time}.mp4"
+    final_video_path = os.path.join(chunks_dir, final_video_name)
+    
     final_video.write_videofile(final_video_path, codec="libx264", audio_codec='aac')
     final_video.close()
     print(f"Final video saved as {final_video_path}")
