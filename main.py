@@ -1,7 +1,7 @@
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
+from moviepy.editor import VideoFileClip, AudioFileClip
 import os, random, shutil
-from moviepy.editor import VideoFileClip
 
 def find_video_with_minimum_length(min_length_sec, search_dir, used_videos):
     suitable_videos = []
@@ -21,13 +21,16 @@ def find_video_with_minimum_length(min_length_sec, search_dir, used_videos):
     else:
         return None
 
-def trim_video_to_match_audio(video_path, output_video_path, duration_sec):
-    with VideoFileClip(video_path) as video:
-        # Trim the video to match the audio duration
-        trimmed_video = video.subclip(0, duration_sec)
-        trimmed_video.write_videofile(output_video_path, codec="libx264", audio_codec="aac")
+def trim_and_replace_audio(video_path, audio_path, output_path, audio_length):
+    video_clip = VideoFileClip(video_path).subclip(0, audio_length)
+    audio_clip = AudioFileClip(audio_path).subclip(0, audio_length)
+    final_clip = video_clip.set_audio(audio_clip)
+    final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac', temp_audiofile='temp-audio.m4a', remove_temp=True)
+    video_clip.close()
+    audio_clip.close()
+    final_clip.close()
 
-def remove_silence_and_pair_with_videos(audio_path, audio_output_dir="videos/out", initial_video_search_dir="videos/hooks", subsequent_video_search_dir="videos/viral"):
+def process_audio_and_video(audio_path, audio_output_dir="videos/out", initial_video_search_dir="videos/hooks", subsequent_video_search_dir="videos/viral"):
     audio = AudioSegment.from_mp3(audio_path)
     chunks = split_on_silence(audio, min_silence_len=500, silence_thresh=-40)
 
@@ -44,20 +47,20 @@ def remove_silence_and_pair_with_videos(audio_path, audio_output_dir="videos/out
     for i, chunk in enumerate(chunks):
         chunk_filename = os.path.join(chunks_dir, f"{i+1}.mp3")
         chunk.export(chunk_filename, format="mp3")
+        audio_length = len(chunk) / 1000.0  # Duration of the chunk in seconds
 
-        min_length_sec = len(chunk) / 1000.0  # Duration of the chunk in seconds
         search_dir = initial_video_search_dir if i == 0 else subsequent_video_search_dir
-        video_name = find_video_with_minimum_length(min_length_sec, search_dir, used_videos)
-        
+        video_name = find_video_with_minimum_length(audio_length, search_dir, used_videos)
+
         if video_name:
             video_path = os.path.join(search_dir, video_name)
             output_video_path = os.path.join(chunks_dir, f"video_{i+1}.mp4")
-            # Trim and save the video to match the audio length
-            trim_video_to_match_audio(video_path, output_video_path, min_length_sec)
-            print(f"Chunk {i+1} saved as {chunk_filename}, paired with trimmed video: {video_name} from {search_dir}")
+            trim_and_replace_audio(video_path, chunk_filename, output_video_path, audio_length)
+            print(f"Chunk {i+1} saved as {chunk_filename}, paired with video: {video_name} trimmed and audio replaced.")
         else:
             print(f"Chunk {i+1} saved as {chunk_filename}, no suitable video found in {search_dir} not already used.")
 
-# Simulating the input
-audio_path = input("Insert file path for audio: ")  # Prompt for the audio file path
-remove_silence_and_pair_with_videos(audio_path)
+# Example usage
+if __name__ == "__main__":
+    audio_path = input("Insert file path for audio: ")  # Prompt for the audio file path
+    process_audio_and_video(audio_path)
