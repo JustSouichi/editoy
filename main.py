@@ -78,4 +78,5 @@ def process_audio_and_video(audio_path, audio_output_dir="videos/out", initial_v
 # Example usage
 if __name__ == "__main__":
     audio_path = input("Insert file path for audio: ")  # Prompt for the audio file path
+    audio_path = "audio/" + audio_path
     process_audio_and_video(audio_path)
