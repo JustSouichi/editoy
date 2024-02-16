@@ -21,6 +21,12 @@ def find_video_with_minimum_length(min_length_sec, search_dir, used_videos):
     else:
         return None
 
+def trim_video_to_match_audio(video_path, output_video_path, duration_sec):
+    with VideoFileClip(video_path) as video:
+        # Trim the video to match the audio duration
+        trimmed_video = video.subclip(0, duration_sec)
+        trimmed_video.write_videofile(output_video_path, codec="libx264", audio_codec="aac")
+
 def remove_silence_and_pair_with_videos(audio_path, audio_output_dir="videos/out", initial_video_search_dir="videos/hooks", subsequent_video_search_dir="videos/viral"):
     audio = AudioSegment.from_mp3(audio_path)
     chunks = split_on_silence(audio, min_silence_len=500, silence_thresh=-40)
@@ -45,10 +51,10 @@ def remove_silence_and_pair_with_videos(audio_path, audio_output_dir="videos/out
         
         if video_name:
             video_path = os.path.join(search_dir, video_name)
-            # Copy the selected video into the output directory
             output_video_path = os.path.join(chunks_dir, f"video_{i+1}.mp4")
-            shutil.copy(video_path, output_video_path)
-            print(f"Chunk {i+1} saved as {chunk_filename}, paired with video: {video_name} from {search_dir}")
+            # Trim and save the video to match the audio length
+            trim_video_to_match_audio(video_path, output_video_path, min_length_sec)
+            print(f"Chunk {i+1} saved as {chunk_filename}, paired with trimmed video: {video_name} from {search_dir}")
         else:
             print(f"Chunk {i+1} saved as {chunk_filename}, no suitable video found in {search_dir} not already used.")
 
