@@ -1,33 +1,49 @@
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
-from tqdm import tqdm
-import os
+import os, random, shutil
+from moviepy.editor import VideoFileClip
 
-def remove_silence_and_save_chunks_in_named_dir(audio_path, base_output_dir="videos/out"):
-    # Load the audio file
+def find_video_with_minimum_length(min_length_sec, search_dir):
+    suitable_videos = []
+    for file in os.listdir(search_dir):
+        if file.endswith(".mp4"):
+            video_path = os.path.join(search_dir, file)
+            try:
+                with VideoFileClip(video_path) as video:
+                    if video.duration >= min_length_sec:
+                        suitable_videos.append(file)
+            except Exception as e:
+                print(f"Error processing video {video_path}: {e}")
+    return random.choice(suitable_videos) if suitable_videos else None
+
+def remove_silence_and_select_video_for_first_chunk(audio_path, audio_output_dir="videos/out", video_search_dir="videos/hooks"):
     audio = AudioSegment.from_mp3(audio_path)
+    chunks = split_on_silence(audio, min_silence_len=500, silence_thresh=-40)
 
-    # Split audio on silence
-    chunks = split_on_silence(
-        audio,
-        # Use a silence threshold of -40 dBFS. Adjust this value based on your needs.
-        min_silence_len=500,  # Minimum length of silence in ms to consider it as silence
-        silence_thresh=-40    # Silence threshold in dBFS
-    )
+    if not chunks:
+        print("No audio chunks found.")
+        return
 
-    # Get the base filename without the path and extension
     base_filename = os.path.basename(os.path.splitext(audio_path)[0])
-
-    # Create a directory for this file within the base output directory
-    chunks_dir = os.path.join(base_output_dir, base_filename)
+    chunks_dir = os.path.join(audio_output_dir, base_filename)
     os.makedirs(chunks_dir, exist_ok=True)
 
-    # Save each chunk as a separate file in the new directory
-    for i, chunk in enumerate(tqdm(chunks, desc="Saving chunks")):
-        chunk_filename = os.path.join(chunks_dir, f"{i+1}.mp3")
-        chunk.export(chunk_filename, format="mp3")
-        print(f"Chunk saved as {chunk_filename}")
+    # Process only the first chunk
+    chunk = chunks[0]
+    chunk_filename = os.path.join(chunks_dir, "1.mp3")
+    chunk.export(chunk_filename, format="mp3")
 
-# Example usage
-audio_path = input("Insert url file audio: ")  # Prompt the user to enter the audio file path
-remove_silence_and_save_chunks_in_named_dir(audio_path)
+    min_length_sec = len(chunk) / 1000.0  # Duration of the chunk in seconds
+    video_name = find_video_with_minimum_length(min_length_sec, video_search_dir)
+    if video_name:
+        video_path = os.path.join(video_search_dir, video_name)
+        # Copy the selected video into the output directory
+        output_video_path = os.path.join(chunks_dir, video_name)
+        shutil.copy(video_path, output_video_path)
+        print(f"First chunk saved as {chunk_filename}, matched with video: {video_name}")
+    else:
+        print(f"First chunk saved as {chunk_filename}, no suitable video found.")
+
+# Simulating the input
+audio_path = input("insert url audio: ")  # Assuming 'test.mp3' is the file you want to process
+remove_silence_and_select_video_for_first_chunk(audio_path)
